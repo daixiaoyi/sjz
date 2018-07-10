@@ -83,15 +83,15 @@
     >
       <v-layout row wrap>
         <template v-for="order in orderList">
-          <v-flex xs4>
+          <v-flex xs2 @click="showConfirm(order)">
             <v-card :color="order.color" class="white--text">
               <v-card-title primary-title>
-                <div class="headline">订单号：{{order.id}}</div>
+                <div class="title">订单号：{{order.id}}</div>
               </v-card-title>
               <v-card-text>
-                <div>食品类型：{{order.foodName}}</div>
-                <div>剩余时间：{{order.timeOutText}}秒</div>
-                <div>订单状态：{{order.info}}</div>
+                <div class="body-2">食品类型：{{order.foodName}}</div>
+                <div class="body-2">订单状态：{{order.info}}</div>
+                <div class="title">剩余时间：{{order.timeOutText}}秒</div>
               </v-card-text>
               <v-card-actions>
                 <v-btn flat dark @click="showConfirm(order)" :disabled="order.ensureDisabled">{{order.ensureText}}
