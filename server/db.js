@@ -16,7 +16,10 @@ const orderSchema = mongoose.Schema({
   state: String,
   foodId: String,
   timer: String,
-  timeOutText: String
+  timeOutText: String,
+  waitTimeout: String,
+  workTimeout: String,
+  settled: String
 })
 const foodSchema = mongoose.Schema({
   id: String,

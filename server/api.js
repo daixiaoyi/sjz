@@ -17,7 +17,10 @@ router.post('/api/order/createOrder', (req, res) => {
     state: req.body.state,
     foodId: req.body.foodId,
     timer: req.body.timer,
-    timeOutText: req.body.timeOutText
+    timeOutText: req.body.timeOutText,
+    waitTimeout: req.body.waitTimeout,
+    workTimeout: req.body.workTimeout,
+    settled: req.body.settled
   })
   // 保存数据newAccount数据进mongoDB
   newOrder.save((err, data) => {
@@ -31,12 +34,30 @@ router.post('/api/order/createOrder', (req, res) => {
 // 更新订单
 router.post('/api/order/updateOrder', (req, res) => {
   var conditions = {_id: req.body._id}
-  var updates = {$set: {state: req.body.state, beginTime: req.body.beginTime}}
+  var updates = {
+    $set: {
+      state: req.body.state,
+      beginTime: req.body.beginTime,
+      waitTimeout: req.body.waitTimeout,
+      workTimeout: req.body.workTimeout,
+      settled: req.body.settled
+    }
+  }
   models.Order.update(conditions, updates, function (error) {
     if (error) {
       console.error(error)
     } else {
       res.send('updateOrder successed')
+    }
+  })
+})
+// 结算所有订单
+router.post('/api/order/settleOrder', (req, res) => {
+  models.Order.remove((err, data) => {
+    if (err) {
+      res.send(err)
+    } else {
+      res.send(data)
     }
   })
 })
@@ -55,7 +76,7 @@ router.post('/api/order/deleteOrder', (req, res) => {
 router.get('/api/order/getOrderList', (req, res) => {
   var timeStamp = new Date()
   timeStamp = timeStamp.getTime() / 1000
-  models.Order.find({orderTime: {$gt: timeStamp - 86400}}, (err, data) => {
+  models.Order.find({orderTime: {$gt: timeStamp - 172800}}, (err, data) => {
     if (err) {
       res.send(err)
     } else {
