@@ -1,5 +1,23 @@
 <template>
   <v-card>
+    <!--弹出权限-->
+    <v-layout row justify-center>
+      <v-dialog v-model="role_dialog" max-width="500px">
+        <v-card>
+          <v-card-title>
+            <span class="headline">请输入密码确认角色</span>
+          </v-card-title>
+          <v-card-text>
+            <v-text-field label="密码" v-model="pwd" type="password"/>
+          <v-card-actions>
+            <v-spacer/>
+            <v-btn color="success" @click="validPwd()">登录</v-btn>
+            <v-btn color="error" @click="role_dialog = false">取消</v-btn>
+          </v-card-actions>
+          </v-card-text>
+        </v-card>
+      </v-dialog>
+    </v-layout>
     <!--弹出新增框-->
     <v-layout row justify-center>
       <v-dialog v-model="create_order_dialog" max-width="500px">
@@ -18,8 +36,8 @@
           </v-card-text>
           <v-card-actions>
             <v-spacer/>
-            <v-btn color="success" @click.native="createOrder()" :loading="createOrderLoading">新增</v-btn>
-            <v-btn color="error" @click.native="create_order_dialog = false">取消</v-btn>
+            <v-btn color="success" @click="createOrder()" :loading="createOrderLoading">新增</v-btn>
+            <v-btn color="error" @click="create_order_dialog = false">取消</v-btn>
           </v-card-actions>
         </v-card>
       </v-dialog>
@@ -100,7 +118,7 @@
       <v-toolbar-title>制作中：{{COUNT_WORKING}}</v-toolbar-title>
       <v-toolbar-title>完成：{{COUNT_COMPLETED}}</v-toolbar-title>
       <v-spacer/>
-      <v-btn icon @click="showCreate()">
+      <v-btn icon @click="showCreate()" v-if="roleFlag" title="添加订单">
         <v-icon>add</v-icon>
       </v-btn>
       <v-btn icon @click="changeSort(0)" title="最近时间排序">
@@ -112,7 +130,7 @@
       <v-btn icon @click="changeSort(2)" title="订单类型排序">
         <v-icon>sort</v-icon>
       </v-btn>
-      <v-btn icon @click="showSettle()" title="清空现有订单">
+      <v-btn icon @click="showSettle()" v-if="roleFlag" title="清空现有订单">
         <v-icon>remove_circle</v-icon>
       </v-btn>
     </v-toolbar>
@@ -135,11 +153,11 @@
                 <div class="body-2">{{order.foodName}}</div>
                 <div class="body-2">{{order.info}}</div>
                 <div class="title">剩余时间：</div>
-                <div class="title">{{order.timeOutText}}秒</div>
+                <div class="title">{{s_to_hs(order.timeOutText)}}</div>
               </v-card-text>
               <v-card-actions>
                 <v-spacer/>
-                <v-btn dark icon @click="showDelete(order)" title="删除">
+                <v-btn dark icon @click="showDelete(order)" title="删除" v-if="roleFlag" >
                   <v-icon>delete</v-icon>
                 </v-btn>
               </v-card-actions>
@@ -173,7 +191,7 @@
 <script>
   import axios from 'axios'
   import {getCurrentSecond} from '@/assets/js/Utils'
-
+  axios.defaults.baseURL = 'http://192.168.1.162:8088'
   var newEmptyOrder = {
     id: '',
     type: '0',
@@ -190,7 +208,9 @@
   export default {
     mounted () {
       this.getFoodList()
-      this.getOrderList()
+      setInterval(() => {
+        this.getFoodList()
+      }, 5000)
     },
     data () {
       return {
@@ -222,6 +242,11 @@
         settle_order_dialog: false,
         settleOrderLoading: false,
 
+        role_dialog: true,
+
+        pwd: '',
+        roleFlag: false,
+
         newOrder: newEmptyOrder,
         updateOrder: null,
         orderList: [],
@@ -239,14 +264,24 @@
           {text: '最小订单', value: 'm'},
           {text: '订单类型', value: 'm'}
         ],
-        sortType: 0
+        sortType: 0,
+        timerList: []
       }
     },
     methods: {
+      validPwd () {
+        if (this.pwd === ',./') {
+          this.role_dialog = false
+          this.roleFlag = true
+        } else if (this.pwd === 'cf') {
+          this.role_dialog = false
+        }
+      },
       getFoodList () {
         axios.get('/api/food/getFoodList')
           .then((response) => {
             this.foodList = response.data
+            this.getOrderList()
           })
       },
       getOrderList () {
@@ -261,6 +296,9 @@
             this.COUNT_WORK_TIMEOUT = 0
             this.COUNT_WAITING_TIMEOUT = 0
             this.COUNT_COMPLETED = 0
+            this.timerList.forEach(timer => {
+              clearInterval(timer)
+            })
             this.orderList.forEach((order) => {
               order.foodName = this.foodList[order.foodId].name
               this.countDown(order)
@@ -327,6 +365,12 @@
           })
       },
       confirmOrder () {
+        this.orderList.forEach(order => {
+          if (this.updateOrder.id === order.id) {
+            clearInterval(order.timer)
+            order.timer = null
+          }
+        })
         this.confirmOrderLoading = true
         this.updateOrder.state = this.STATE_WORKING
         this.updateOrder.beginTime = getCurrentSecond()
@@ -340,6 +384,12 @@
           })
       },
       confirmComplete () {
+        this.orderList.forEach(order => {
+          if (this.updateOrder.id === order.id) {
+            clearInterval(order.timer)
+            order.timer = null
+          }
+        })
         this.updateOrder.state = this.STATE_COMPLETED
         this.updateOrderState()
       },
@@ -370,45 +420,67 @@
             this.getOrderList()
           })
       },
+      s_to_hs (s) {
+        // 计算分钟
+        // 算法：将秒数除以60，然后下舍入，既得到分钟数
+        var h
+        h = Math.floor(s / 60)
+      // 计算秒
+      // 算法：取得秒%60的余数，既得到秒数
+        s = s % 60
+      // 将变量转换为字符串
+        h += ''
+        s += ''
+      // 如果只有一位数，前面增加一个0
+        h = (h.length === 1) ? '0' + h : h
+        s = (s.length === 1) ? '0' + s : s
+        return h + ':' + s
+      },
       countDown (order) {
         if (order.state === this.STATE_WAITING_CONFIRM) {
           this.COUNT_WAITING_CONFIRM++
           order.info = '等待接单'
           order.color = 'warning'
-          order.timer = setInterval(() => {
-            if (getCurrentSecond() - order.orderTime < 300) {
-              order.timeOutText = 300 - (getCurrentSecond() - order.orderTime)
-            } else {
-              order.info = '接单已超时'
-              order.color = 'error'
-              order.timeOutText = '0'
-              order.state = this.STATE_WAITING_TIMEOUT
-              order.waitTimeout = 1
-              this.updateOrder = order
-              this.updateOrderState()
-              clearInterval(order.timer)
-              order.timer = null
-            }
-          }, 1000)
+          if (!order.timer) {
+            order.timer = setInterval(() => {
+              if (getCurrentSecond() - order.orderTime < 300) {
+                order.timeOutText = 300 - (getCurrentSecond() - order.orderTime)
+              } else {
+                order.info = '接单已超时'
+                order.color = 'error'
+                order.timeOutText = '0'
+                order.state = this.STATE_WAITING_TIMEOUT
+                order.waitTimeout = 1
+                this.updateOrder = order
+                this.updateOrderState()
+                clearInterval(order.timer)
+                order.timer = null
+              }
+            }, 1000)
+            this.timerList.push(order.timer)
+          }
         } else if (order.state === this.STATE_WORKING) {
           this.COUNT_WORKING++
           order.info = '已接单，处理中'
           order.color = 'primary'
-          order.timer = setInterval(() => {
-            if (getCurrentSecond() - order.beginTime < this.foodList[order.foodId].time * 60) {
-              order.timeOutText = this.foodList[order.foodId].time * 60 - (getCurrentSecond() - order.beginTime)
-            } else {
-              order.info = '制作已超时'
-              order.color = 'error'
-              order.timeOutText = '0'
-              order.state = this.STATE_WORK_TIMEOUT
-              order.workTimeout = 1
-              this.updateOrder = order
-              this.updateOrderState()
-              clearInterval(order.timer)
-              order.timer = null
-            }
-          }, 1000)
+          if (!order.timer) {
+            order.timer = setInterval(() => {
+              if (getCurrentSecond() - order.beginTime < this.foodList[order.foodId].time * 60) {
+                order.timeOutText = this.foodList[order.foodId].time * 60 - (getCurrentSecond() - order.beginTime)
+              } else {
+                order.info = '制作已超时'
+                order.color = 'error'
+                order.timeOutText = '0'
+                order.state = this.STATE_WORK_TIMEOUT
+                order.workTimeout = 1
+                this.updateOrder = order
+                this.updateOrderState()
+                clearInterval(order.timer)
+                order.timer = null
+              }
+            }, 1000)
+            this.timerList.push(order.timer)
+          }
         } else if (order.state === this.STATE_WORK_TIMEOUT) {
           this.COUNT_WORK_TIMEOUT++
           order.info = '制作已超时'
